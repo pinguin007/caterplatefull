@@ -165,20 +165,63 @@ export const adminResolveDispute = mutation({
   },
 });
 
-// Helper mutation to create an admin (for testing purposes)
+// PRODUCTION: Secure admin creation - only allow specific emails or existing admins
 export const createAdmin = mutation({
-  args: {},
+  args: {
+    targetUserId: v.optional(v.id("users")), // Optional: if existing admin is promoting someone
+  },
   returns: v.id("admins"),
-  handler: async (ctx) => {
+  handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) {
       throw new Error("Not authenticated");
     }
 
-    // Check if user is already an admin
+    const user = await ctx.db.get(userId);
+    if (!user || !user.email) {
+      throw new Error("User email not found");
+    }
+
+    // Check if there are any existing admins
+    const existingAdmins = await ctx.db.query("admins").collect();
+
+    if (existingAdmins.length === 0) {
+      // First admin setup - check against whitelist of allowed emails
+      // TODO: Add your email to this list before deploying to production
+      const allowedAdminEmails = [
+        // Add your email here, e.g., "your-email@example.com"
+        // This allows the first admin to be created
+        "theoriginalyusuf@gmail.com",
+      ];
+
+      if (!allowedAdminEmails.includes(user.email)) {
+        throw new Error(
+          "Admin creation restricted. Contact system administrator."
+        );
+      }
+
+      // Create the first admin
+      return await ctx.db.insert("admins", {
+        userId,
+        role: "admin",
+      });
+    }
+
+    // If admins exist, only existing admins can create new admins
+    const requestingUserIsAdmin = await isAdmin(ctx);
+    if (!requestingUserIsAdmin) {
+      throw new Error(
+        "Only existing admins can create new admins. Contact an administrator."
+      );
+    }
+
+    // If promoting another user, use targetUserId, otherwise promote self
+    const targetId = args.targetUserId || userId;
+
+    // Check if target is already an admin
     const existingAdmin = await ctx.db
       .query("admins")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .withIndex("by_user", (q) => q.eq("userId", targetId))
       .unique();
 
     if (existingAdmin) {
@@ -186,7 +229,7 @@ export const createAdmin = mutation({
     }
 
     return await ctx.db.insert("admins", {
-      userId,
+      userId: targetId,
       role: "admin",
     });
   },
