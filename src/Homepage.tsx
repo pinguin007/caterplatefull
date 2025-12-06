@@ -281,7 +281,7 @@ export function Homepage({ setCurrentPage }: HomepageProps) {
             <p className="text-gray-600 mb-6">
               Sign in to join our catering marketplace. You'll be able to choose your role after signing in.
             </p>
-            <SignInForm />
+            <SignInForm onSuccess={() => setShowSignIn(false)} />
           </div>
         </div>
       )}
