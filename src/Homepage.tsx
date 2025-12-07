@@ -2,7 +2,7 @@ import { useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 import { Authenticated, Unauthenticated } from "convex/react";
 import { SignInForm } from "./SignInForm";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface HomepageProps {
   setCurrentPage: (page: "homepage" | "dashboard" | "menu" | "my-orders" | "vendor-orders" | "admin" | { type: "vendor"; vendorId: string }) => void;
@@ -12,6 +12,14 @@ export function Homepage({ setCurrentPage }: HomepageProps) {
   const [showSignIn, setShowSignIn] = useState(false);
   const vendorsWithCounts = useQuery(api.vendors.getVendorWithMenuCount);
   const userProfile = useQuery(api.profiles.getCurrentUserProfile);
+  const loggedInUser = useQuery(api.auth.loggedInUser);
+
+  // Close sign-in modal when user successfully authenticates
+  useEffect(() => {
+    if (loggedInUser) {
+      setShowSignIn(false);
+    }
+  }, [loggedInUser]);
 
   if (vendorsWithCounts === undefined) {
     return (
